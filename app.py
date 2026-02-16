@@ -1,8 +1,8 @@
-import json
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
 
+from github_client import get_repo, list_repos
 from linear_client import get_issue, list_issues
 
 app = FastAPI()
@@ -57,13 +57,54 @@ def read_linear_issue(issue_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ---------- GitHub webhook ----------
+# ---------- GitHub repos ----------
 
-@app.post("/webhook/github")
-@app.get("/webhook/github")
-async def github_webhook(request: Request):
-    payload = await request.json()
-    print("========== GITHUB WEBHOOK RECEIVED ==========")
-    print(json.dumps(payload, indent=2))
-    print("============================================")
-    return {"status": "received"}
+@app.get("/github/repos")
+def read_github_repos(
+    per_page: int = 50,
+    page: int = 1,
+    type_filter: Optional[str] = None,
+    sort: Optional[str] = None,
+    owner: Optional[str] = None,
+    org: bool = False,
+):
+    """
+    List repos from GitHub.
+
+    - **per_page**: Max number of repos (default 50, max 100).
+    - **page**: Page number for pagination.
+    - **type_filter**: For user: "all", "owner", "member". For org: "all", "public", "private".
+    - **sort**: "created", "updated", "pushed", "full_name".
+    - **owner**: Optional username or org to list their repos. If omitted, uses authenticated user's repos.
+    - **org**: If True and owner is set, treat owner as an org name.
+    """
+    try:
+        result = list_repos(
+            per_page=per_page,
+            page=page,
+            type_filter=type_filter,
+            sort=sort,
+            owner=owner,
+            org=org,
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/github/repos/{owner}/{repo}")
+def read_github_repo(owner: str, repo: str):
+    """
+    Get a single GitHub repo by owner and repo name (e.g. octocat/Hello-World).
+    """
+    try:
+        repo_data = get_repo(owner=owner, repo=repo)
+        if repo_data is None:
+            raise HTTPException(status_code=404, detail="Repo not found")
+        return repo_data
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

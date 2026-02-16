@@ -9,3 +9,6 @@ load_dotenv(dotenv_path=env_path)
 
 LINEAR_API_KEY = os.getenv("LINEAR_API_KEY")
 LINEAR_GRAPHQL_URL = "https://api.linear.app/graphql"
+
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+GITHUB_API_URL = "https://api.github.com"

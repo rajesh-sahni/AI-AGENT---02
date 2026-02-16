@@ -1,6 +1,6 @@
 # AI Agent
 
-FastAPI app with Linear integration and GitHub webhooks.
+FastAPI app to read Linear issues and GitHub repos.
 
 ## Setup
 
@@ -17,6 +17,7 @@ Create a `.env` in the project root:
 
 ```
 LINEAR_API_KEY=your_linear_api_key
+GITHUB_TOKEN=your_github_personal_access_token
 ```
 
 ## Run
@@ -29,6 +30,10 @@ API: `http://localhost:8000`
 
 ## API
 
-List Linear Issues: `http://localhost:8000/linear/issues`
+**Linear**
+- List issues: `GET http://localhost:8000/linear/issues`
+- Get issue: `GET http://localhost:8000/linear/issues/{issue_id}`
 
-Github Webhook: `http://localhost:8000/webhook/github`
+**GitHub**
+- List repos: `GET http://localhost:8000/github/repos` (your repos) or `GET http://localhost:8000/github/repos?owner=username`
+- Get repo: `GET http://localhost:8000/github/repos/{owner}/{repo}`

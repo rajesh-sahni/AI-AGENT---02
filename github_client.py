@@ -1,0 +1,97 @@
+"""
+GitHub API client – fetch repos via REST API.
+Uses GITHUB_TOKEN from .env.
+"""
+
+import os
+from typing import Any, Optional
+
+import requests
+
+from config import GITHUB_API_URL, GITHUB_TOKEN
+
+
+def _headers() -> dict[str, str]:
+    """Build request headers with GitHub token."""
+    token = GITHUB_TOKEN or os.getenv("GITHUB_TOKEN")
+    if not token:
+        raise ValueError("GITHUB_TOKEN is not set in .env")
+    return {
+        "Authorization": f"Bearer {token.strip()}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+
+
+def _get(path: str, params: Optional[dict[str, Any]] = None) -> Any:
+    """Send a GET request to GitHub API and return the JSON response."""
+    url = f"{GITHUB_API_URL.rstrip('/')}/{path.lstrip('/')}"
+    resp = requests.get(
+        url,
+        headers=_headers(),
+        params=params,
+        timeout=30,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+def list_repos(
+    per_page: int = 50,
+    page: int = 1,
+    type_filter: Optional[str] = None,
+    sort: Optional[str] = None,
+    owner: Optional[str] = None,
+    org: bool = False,
+) -> dict[str, Any]:
+    """
+    Fetch a page of repos from GitHub.
+
+    - If owner is None: fetches the authenticated user's repos.
+    - If owner is set: fetches that user's repos (org=False) or org's repos (org=True).
+
+    :param per_page: Max number of repos per page (default 50, max 100).
+    :param page: Page number for pagination.
+    :param type_filter: For user repos: "all", "owner", "member". For org: "all", "public", "private".
+    :param sort: "created", "updated", "pushed", "full_name".
+    :param owner: Optional owner (username or org) to list their repos instead of current user.
+    :param org: If True and owner is set, use orgs/{owner}/repos. If False, use users/{owner}/repos.
+    :return: Dict with "nodes" (list of repos) and "pageInfo" (hasNextPage, page).
+    """
+    per_page = min(per_page, 100)
+    params: dict[str, Any] = {"per_page": per_page, "page": page}
+    if sort:
+        params["sort"] = sort
+    if type_filter:
+        params["type"] = type_filter
+
+    if owner:
+        path = f"orgs/{owner}/repos" if org else f"users/{owner}/repos"
+    else:
+        path = "user/repos"
+
+    data = _get(path, params)
+
+    # GitHub returns a list; normalize to match Linear's shape
+    return {
+        "nodes": data,
+        "pageInfo": {
+            "hasNextPage": len(data) == per_page,
+            "page": page,
+        },
+    }
+
+
+def get_repo(owner: str, repo: str) -> Optional[dict[str, Any]]:
+    """
+    Fetch a single repo by owner and repo name.
+
+    :param owner: GitHub username or org name.
+    :param repo: Repository name.
+    :return: Repo dict or None if not found.
+    """
+    try:
+        return _get(f"repos/{owner}/{repo}")
+    except requests.HTTPError as e:
+        if e.response is not None and e.response.status_code == 404:
+            return None
+        raise
