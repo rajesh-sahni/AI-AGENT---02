@@ -95,3 +95,31 @@ def get_repo(owner: str, repo: str) -> Optional[dict[str, Any]]:
         if e.response is not None and e.response.status_code == 404:
             return None
         raise
+
+
+def get_branch(
+    owner: str,
+    repo: str,
+    branch: Optional[str] = None,
+) -> Optional[dict[str, Any]]:
+    """
+    Fetch the main (default) branch of a repo, or a specific branch.
+
+    If branch is None, uses the repo's default branch (e.g. main or master).
+
+    :param owner: GitHub username or org name.
+    :param repo: Repository name.
+    :param branch: Optional branch name. If omitted, uses the repo's default branch.
+    :return: Branch dict (name, commit.sha, protected, etc.) or None if not found.
+    """
+    if branch is None:
+        repo_data = get_repo(owner=owner, repo=repo)
+        if repo_data is None:
+            return None
+        branch = repo_data.get("default_branch") or "main"
+    try:
+        return _get(f"repos/{owner}/{repo}/branches/{branch}")
+    except requests.HTTPError as e:
+        if e.response is not None and e.response.status_code == 404:
+            return None
+        raise

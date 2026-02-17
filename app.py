@@ -2,7 +2,7 @@ from typing import Optional
 
 from fastapi import FastAPI, HTTPException
 
-from github_client import get_repo, list_repos
+from github_client import get_branch, get_repo, list_repos
 from linear_client import get_issue, list_issues
 
 app = FastAPI()
@@ -104,6 +104,48 @@ def read_github_repo(owner: str, repo: str):
         if repo_data is None:
             raise HTTPException(status_code=404, detail="Repo not found")
         return repo_data
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/github/repos/{owner}/{repo}/branch")
+def read_github_repo_branch(
+    owner: str,
+    repo: str,
+    branch: Optional[str] = None,
+):
+    """
+    Read the main (default) branch of a specific repo, or a given branch.
+
+    - **owner**: GitHub username or org (e.g. octocat).
+    - **repo**: Repository name (e.g. Hello-World).
+    - **branch**: Optional. Branch name to read. If omitted, returns the repo's default branch (e.g. main).
+    """
+    try:
+        branch_data = get_branch(owner=owner, repo=repo, branch=branch)
+        if branch_data is None:
+            raise HTTPException(status_code=404, detail="Repo or branch not found")
+        return branch_data
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/github/repos/{owner}/{repo}/{branch}")
+def read_github_repo_branch_by_path(owner: str, repo: str, branch: str):
+    """
+    Read a specific branch of a repo using the branch name in the URL path.
+
+    Example: GET /github/repos/rajesh-sahni/FAQ-AGENt/main
+    """
+    try:
+        branch_data = get_branch(owner=owner, repo=repo, branch=branch)
+        if branch_data is None:
+            raise HTTPException(status_code=404, detail="Repo or branch not found")
+        return branch_data
     except ValueError as e:
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:

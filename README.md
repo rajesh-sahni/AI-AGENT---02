@@ -31,9 +31,13 @@ API: `http://localhost:8000`
 ## API
 
 **Linear**
+
 - List issues: `GET http://localhost:8000/linear/issues`
 - Get issue: `GET http://localhost:8000/linear/issues/{issue_id}`
 
 **GitHub**
+
 - List repos: `GET http://localhost:8000/github/repos` (your repos) or `GET http://localhost:8000/github/repos?owner=username`
 - Get repo: `GET http://localhost:8000/github/repos/{owner}/{repo}`
+
+- Read branch: `GET http://localhost:8000/github/repos/{owner}/{repo}/{branch}` (e.g. `.../rajesh-sahni/FAQ-AGENt/main`) or `GET http://localhost:8000/github/repos/{owner}/{repo}/branch?branch=main`
