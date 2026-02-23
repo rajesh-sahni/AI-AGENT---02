@@ -1,8 +1,9 @@
 from typing import Optional
 
+import requests
 from fastapi import FastAPI, HTTPException
 
-from github_client import get_branch, get_repo, list_repos
+from github_client import create_pull_request, get_branch, get_repo, list_repos
 from linear_client import get_issue, list_issues
 
 app = FastAPI()
@@ -146,6 +147,57 @@ def read_github_repo_branch_by_path(owner: str, repo: str, branch: str):
         if branch_data is None:
             raise HTTPException(status_code=404, detail="Repo or branch not found")
         return branch_data
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/github/repos/{owner}/{repo}/pulls")
+def create_github_pull_request(
+    owner: str,
+    repo: str,
+    head: str,
+    base: str,
+    title: str,
+    body: Optional[str] = None,
+    draft: bool = False,
+    head_repo_owner: Optional[str] = None,
+):
+    """
+    Create a pull request from any branch to any branch.
+
+    - **owner**: Repo owner (e.g. octocat).
+    - **repo**: Repo name (e.g. Hello-World).
+    - **head**: Source branch (the branch with your changes).
+    - **base**: Target branch (the branch you want to merge into).
+    - **title**: PR title (required).
+    - **body**: Optional PR description.
+    - **draft**: If true, create as draft PR.
+    - **head_repo_owner**: For forks, pass the fork owner; head sent as owner:branch.
+    """
+    try:
+        result = create_pull_request(
+            owner=owner,
+            repo=repo,
+            head=head,
+            base=base,
+            title=title,
+            body=body,
+            draft=draft,
+            head_repo_owner=head_repo_owner,
+        )
+        return result
+    except requests.HTTPError as e:
+        detail = str(e)
+        if e.response is not None:
+            try:
+                detail = e.response.json().get("message", str(e))
+            except Exception:
+                pass
+        raise HTTPException(
+            status_code=e.response.status_code if e.response else 422, detail=detail
+        )
     except ValueError as e:
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:

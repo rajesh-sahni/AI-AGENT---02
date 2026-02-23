@@ -35,6 +35,19 @@ def _get(path: str, params: Optional[dict[str, Any]] = None) -> Any:
     return resp.json()
 
 
+def _post(path: str, json_body: dict[str, Any]) -> Any:
+    """Send a POST request to GitHub API and return the JSON response."""
+    url = f"{GITHUB_API_URL.rstrip('/')}/{path.lstrip('/')}"
+    resp = requests.post(
+        url,
+        headers=_headers(),
+        json=json_body,
+        timeout=30,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
 def list_repos(
     per_page: int = 50,
     page: int = 1,
@@ -123,3 +136,38 @@ def get_branch(
         if e.response is not None and e.response.status_code == 404:
             return None
         raise
+
+
+def create_pull_request(
+    owner: str,
+    repo: str,
+    head: str,
+    base: str,
+    title: str,
+    body: Optional[str] = None,
+    draft: bool = False,
+    head_repo_owner: Optional[str] = None,
+) -> dict[str, Any]:
+    """
+    Create a pull request from any branch to any branch.
+
+    :param owner: Repository owner (e.g. octocat).
+    :param repo: Repository name (e.g. Hello-World).
+    :param head: Source (head) branch name.
+    :param base: Target (base) branch name.
+    :param title: PR title (required).
+    :param body: Optional PR description.
+    :param draft: If True, create as draft PR.
+    :param head_repo_owner: If the head branch is in a fork, pass the fork owner.
+    :return: Created pull request dict from GitHub.
+    """
+    payload: dict[str, Any] = {
+        "title": title,
+        "head": f"{head_repo_owner}:{head}" if head_repo_owner else head,
+        "base": base,
+    }
+    if body is not None:
+        payload["body"] = body
+    if draft:
+        payload["draft"] = True
+    return _post(f"repos/{owner}/{repo}/pulls", payload)

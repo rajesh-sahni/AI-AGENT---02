@@ -41,3 +41,41 @@ API: `http://localhost:8000`
 - Get repo: `GET http://localhost:8000/github/repos/{owner}/{repo}`
 
 - Read branch: `GET http://localhost:8000/github/repos/{owner}/{repo}/{branch}` (e.g. `.../rajesh-sahni/FAQ-AGENt/main`) or `GET http://localhost:8000/github/repos/{owner}/{repo}/branch?branch=main`
+- Create pull request: `POST http://localhost:8000/github/repos/{owner}/{repo}/pulls?head={source_branch}&base={target_branch}&title={title}`
+
+## Create Pull Request (any branch to any branch)
+
+Create a PR from any source branch to any target branch:
+
+```
+POST /github/repos/{owner}/{repo}/pulls?head=feature-branch&base=main&title=My%20PR%20Title
+```
+
+Optional query params: `body`, `draft`, `head_repo_owner` (for forks).
+
+### Test steps
+
+1. **Start the server**
+   ```bash
+   venv\Scripts\activate
+   uvicorn app:app --reload
+   ```
+
+2. **Ensure you have two branches** in a repo you can push to (e.g. `main` and `feature-xyz`).
+
+3. **Create a PR via curl** (Git Bash or use `curl.exe` in PowerShell):
+   ```bash
+   curl -X POST "http://localhost:8000/github/repos/YOUR_OWNER/YOUR_REPO/pulls?head=feature-xyz&base=main&title=Test%20PR%20from%20API"
+   ```
+
+4. **With body**:
+   ```bash
+   curl -X POST "http://localhost:8000/github/repos/YOUR_OWNER/YOUR_REPO/pulls?head=feature-xyz&base=main&title=Test%20PR&body=Description%20of%20changes"
+   ```
+
+5. **PowerShell alternative**:
+   ```powershell
+   Invoke-RestMethod -Uri "http://localhost:8000/github/repos/YOUR_OWNER/YOUR_REPO/pulls?head=feature-xyz&base=main&title=Test%20PR" -Method POST
+   ```
+
+6. **Interactive docs**: Open `http://localhost:8000/docs`, find `POST /github/repos/{owner}/{repo}/pulls`, click "Try it out", enter owner, repo, head, base, title, then "Execute".
