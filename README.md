@@ -1,6 +1,6 @@
 # AI Agent
 
-FastAPI app to read Linear issues and GitHub repos.
+FastAPI app with Linear issues, GitHub repos, and an AI chat agent (Ollama + Llama) like ChatGPT.
 
 ## Setup
 
@@ -18,6 +18,14 @@ Create a `.env` in the project root:
 ```
 LINEAR_API_KEY=your_linear_api_key
 GITHUB_TOKEN=your_github_personal_access_token
+# OLLAMA_BASE_URL=http://localhost:11434  # optional, default
+```
+
+**For AI chat**, install and run [Ollama](https://ollama.com):
+
+```bash
+ollama pull llama3.2
+ollama serve   # usually runs automatically
 ```
 
 ## Run
@@ -79,3 +87,54 @@ Optional query params: `body`, `draft`, `head_repo_owner` (for forks).
    ```
 
 6. **Interactive docs**: Open `http://localhost:8000/docs`, find `POST /github/repos/{owner}/{repo}/pulls`, click "Try it out", enter owner, repo, head, base, title, then "Execute".
+
+---
+
+## AI Agent (Ollama + Llama – ChatGPT-like)
+
+Chat with Llama and other models via Ollama. All AI code lives in `ai_agent/`:
+
+```
+ai_agent/
+  __init__.py
+  schemas.py      # ChatRequest, ChatResponse
+  ollama_client.py  # Ollama API client
+  routes.py       # FastAPI routes
+  static/
+    chat.html     # ChatGPT-like UI
+```
+
+### Endpoints
+
+- **Chat UI**: `GET http://localhost:8000/ai/chat` – ChatGPT-like web interface
+- **List models**: `GET http://localhost:8000/ai/models`
+- **Send message (API)**: `POST http://localhost:8000/ai/chat` with JSON body:
+  ```json
+  {
+    "message": "Hello, how are you?",
+    "model": "llama3.2",
+    "history": [],
+    "stream": false
+  }
+  ```
+
+### Test AI chat
+
+1. Install Ollama and pull a model:
+   ```bash
+   ollama pull llama3.2
+   ```
+
+2. Start the app:
+   ```bash
+   uvicorn app:app --reload
+   ```
+
+3. Open the chat UI: `http://localhost:8000/ai/chat`
+
+4. Or call the API:
+   ```bash
+   curl -X POST "http://localhost:8000/ai/chat" \
+     -H "Content-Type: application/json" \
+     -d '{"message":"Hello","model":"llama3.2"}'
+   ```

@@ -3,10 +3,12 @@ from typing import Optional
 import requests
 from fastapi import FastAPI, HTTPException
 
+from ai_agent.routes import router as ai_router
 from github_client import create_pull_request, get_branch, get_repo, list_repos
 from linear_client import get_issue, list_issues
 
 app = FastAPI()
+app.include_router(ai_router)
 
 
 @app.get("/")
