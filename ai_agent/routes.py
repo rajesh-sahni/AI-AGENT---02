@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse
 
 from ai_agent.ollama_client import chat, list_models
 from ai_agent.schemas import ChatRequest, ChatResponse
-from github_client import list_repos
+from github_client import get_branch, list_repos
 
 router = APIRouter(prefix="/ai", tags=["AI Agent"])
 
@@ -28,6 +28,14 @@ GITHUB_REPOS_INTENT_PATTERNS = [
     r"get\s+(?:me\s+)?(?:my\s+)?repos(?:itories)?",
 ]
 
+# Intent patterns for "show (main/dev) branch of repo X"
+GITHUB_BRANCH_INTENT_PATTERNS = [
+    r"show\s+(?:the\s+)?(?P<branch>main|dev|master|develop)\s+branch\s+(?:of\s+)?(?P<repo>[\w\-\.]+)\s*(?:repo(?:sitory)?)?",
+    r"(?P<branch>main|dev|master|develop)\s+branch\s+(?:of\s+)?(?P<repo>[\w\-\.]+)",
+    r"show\s+branch\s+(?:of\s+)?(?P<repo>[\w\-\.]+)\s*(?:repo(?:sitory)?)?",
+    r"branch\s+(?:details?\s+)?(?:of\s+)?(?P<repo>[\w\-\.]+)\s*(?:repo(?:sitory)?)?",
+]
+
 # Intent patterns for "show details of repo X"
 GITHUB_REPO_DETAIL_PATTERNS = [
     r"(?:details?|info(?:rmation)?)\s+(?:of|about)\s+repo(?:sitory)?\s+(?P<name>[\w\-\.]+)",
@@ -36,6 +44,29 @@ GITHUB_REPO_DETAIL_PATTERNS = [
     r"^show\s+(?P<name>[\w\-\.]+)\s+repo$",
     r"^repo\s+(?P<name>[\w\-\.]+)$",
 ]
+
+
+def _extract_repo_and_branch(message: str) -> Optional[tuple[str, Optional[str]]]:
+    """
+    Extract repo name and optional branch name for branch-details intent.
+
+    Examples:
+    - "show the main branch of FAQ-AGENt repo" -> ("FAQ-AGENt", "main")
+    - "main branch of FAQ-AGENt" -> ("FAQ-AGENt", "main")
+    - "show branch of FAQ-AGENt" -> ("FAQ-AGENt", None)  # default branch
+    """
+    text = message.strip()
+    if not text or "branch" not in text.lower():
+        return None
+
+    for pattern in GITHUB_BRANCH_INTENT_PATTERNS:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if match:
+            repo = (match.group("repo") or "").strip().strip("/")
+            branch = match.groupdict().get("branch")
+            if repo and repo.lower() not in {"repos", "repositories"}:
+                return (repo, branch)
+    return None
 
 
 def _is_github_repos_intent(message: str) -> bool:
@@ -167,6 +198,29 @@ def _format_repo_details(repo: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _format_branch_details(branch_data: dict[str, Any], repo_full_name: str) -> str:
+    """Format GitHub branch data for chat output."""
+    name = branch_data.get("name", "unknown")
+    protected = branch_data.get("protected", False)
+    commit = branch_data.get("commit", {}) or {}
+    sha = commit.get("sha", "unknown")[:7]
+    commit_msg = (commit.get("commit", {}) or {}).get("message", "No message")
+    commit_msg_first_line = commit_msg.split("\n")[0] if commit_msg else "No message"
+    author = (commit.get("commit", {}) or {}).get("author", {}) or {}
+    author_name = author.get("name", "unknown")
+    date = author.get("date", "unknown")
+
+    lines = [
+        f"Branch: {name} (in {repo_full_name})",
+        f"Protected: {protected}",
+        f"Latest commit: {sha}",
+        f"Commit message: {commit_msg_first_line}",
+        f"Author: {author_name}",
+        f"Date: {date}",
+    ]
+    return "\n".join(lines)
+
+
 @router.get("/models", response_model=dict[str, Any])
 def get_models():
     """
@@ -201,6 +255,51 @@ def post_chat(request: ChatRequest):
     - "show details of repo XYZ" / "repo XYZ details" -> single repo details
     """
     message = request.message.strip()
+
+    # Intent: branch details for a specific repo
+    repo_branch = _extract_repo_and_branch(message)
+    if repo_branch:
+        repo_name, branch_name = repo_branch
+        try:
+            repo = _find_repo_by_name(repo_name)
+            if repo is None:
+                return ChatResponse(
+                    message=f"I couldn't find a repository named '{repo_name}' in your GitHub account.",
+                    model="github-api",
+                    done=True,
+                )
+            owner = (repo.get("owner") or {}).get("login", "")
+            if not owner:
+                return ChatResponse(
+                    message=f"Could not determine the owner of repository '{repo_name}'.",
+                    model="github-api",
+                    done=True,
+                )
+            full_name = repo.get("full_name") or f"{owner}/{repo_name}"
+            branch_data = get_branch(owner=owner, repo=repo.get("name", repo_name), branch=branch_name)
+            if branch_data is None:
+                return ChatResponse(
+                    message=f"Branch '{branch_name or 'default'}' not found in {full_name}.",
+                    model="github-api",
+                    done=True,
+                )
+            formatted = _format_branch_details(branch_data, full_name)
+            return ChatResponse(message=formatted, model="github-api", done=True)
+        except ValueError as e:
+            raise HTTPException(status_code=500, detail=str(e))
+        except requests.HTTPError as e:
+            detail = str(e)
+            if e.response is not None:
+                try:
+                    detail = e.response.json().get("message", str(e))
+                except Exception:
+                    pass
+            raise HTTPException(
+                status_code=e.response.status_code if e.response else 500,
+                detail=detail,
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
     # Intent: details for a specific repo
     repo_name = _extract_repo_name(message)
