@@ -12,11 +12,20 @@ from fastapi.responses import FileResponse
 
 from ai_agent.ollama_client import chat, list_models
 from ai_agent.schemas import ChatRequest, ChatResponse
-from github_client import get_branch, list_repos
+from github_client import create_pull_request, get_branch, list_repos
 
 router = APIRouter(prefix="/ai", tags=["AI Agent"])
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
+
+# Intent patterns for "create pull request"
+GITHUB_PR_INTENT_PATTERNS = [
+    # create pull request from dev to main of repo FAQ-AGENt
+    r"create\s+pull\s+request\s+from\s+(?P<head>[\w\-/]+)\s+to\s+(?P<base>[\w\-/]+)\s+of\s+repo\s+(?P<repo>[\w\-\.]+)",
+    r"create\s+pr\s+from\s+(?P<head>[\w\-/]+)\s+to\s+(?P<base>[\w\-/]+)\s+for\s+(?P<repo>[\w\-\.]+)",
+    r"open\s+pull\s+request\s+from\s+(?P<head>[\w\-/]+)\s+to\s+(?P<base>[\w\-/]+)\s+for\s+repo\s+(?P<repo>[\w\-\.]+)",
+]
+
 
 # Intent patterns for "show/list my GitHub repos"
 GITHUB_REPOS_INTENT_PATTERNS = [
@@ -66,6 +75,33 @@ def _extract_repo_and_branch(message: str) -> Optional[tuple[str, Optional[str]]
             branch = match.groupdict().get("branch")
             if repo and repo.lower() not in {"repos", "repositories"}:
                 return (repo, branch)
+    return None
+
+
+def _extract_pr_request(message: str) -> Optional[tuple[str, str, str]]:
+    """
+    Extract (repo_name, head, base) for PR creation intent.
+
+    Example:
+    - "create pull request from dev to main of repo FAQ-AGENt"
+      -> ("FAQ-AGENt", "dev", "main")
+    """
+    text = message.strip()
+    if not text:
+        return None
+    lowered = text.lower()
+    if "pull request" not in lowered and "pr" not in lowered:
+        return None
+
+    for pattern in GITHUB_PR_INTENT_PATTERNS:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if match:
+            head = (match.group("head") or "").strip()
+            base = (match.group("base") or "").strip()
+            repo = (match.group("repo") or "").strip().strip("/")
+            if repo and head and base:
+                return repo, head, base
+
     return None
 
 
@@ -255,6 +291,64 @@ def post_chat(request: ChatRequest):
     - "show details of repo XYZ" / "repo XYZ details" -> single repo details
     """
     message = request.message.strip()
+
+    # Intent: create pull request
+    pr_request = _extract_pr_request(message)
+    if pr_request:
+        repo_name, head, base = pr_request
+        try:
+            repo = _find_repo_by_name(repo_name)
+            if repo is None:
+                return ChatResponse(
+                    message=f"I couldn't find a repository named '{repo_name}' in your GitHub account.",
+                    model="github-api",
+                    done=True,
+                )
+            owner = (repo.get("owner") or {}).get("login", "")
+            if not owner:
+                return ChatResponse(
+                    message=f"Could not determine the owner of repository '{repo_name}'.",
+                    model="github-api",
+                    done=True,
+                )
+            repo_short_name = repo.get("name", repo_name)
+            title = f"Merge {head} into {base}"
+            pr = create_pull_request(
+                owner=owner,
+                repo=repo_short_name,
+                head=head,
+                base=base,
+                title=title,
+            )
+            html_url = pr.get("html_url")
+            number = pr.get("number")
+            success_msg = f"Pull request created successfully: #{number} {title}"
+            if html_url:
+                success_msg += f"\nURL: {html_url}"
+            return ChatResponse(
+                message=success_msg,
+                model="github-api",
+                done=True,
+            )
+        except requests.HTTPError as e:
+            detail = str(e)
+            if e.response is not None:
+                try:
+                    data = e.response.json()
+                    detail = data.get("message", detail)
+                except Exception:
+                    pass
+            return ChatResponse(
+                message=f"Failed to create pull request: {detail}",
+                model="github-api",
+                done=True,
+            )
+        except Exception as e:
+            return ChatResponse(
+                message=f"Failed to create pull request: {e}",
+                model="github-api",
+                done=True,
+            )
 
     # Intent: branch details for a specific repo
     repo_branch = _extract_repo_and_branch(message)
