@@ -189,7 +189,11 @@ def create_github_pull_request(
             draft=draft,
             head_repo_owner=head_repo_owner,
         )
-        return result
+        return {
+            "message": "Pull request created successfully",
+            "html_url": result.get("html_url"),
+            "number": result.get("number"),
+        }
     except requests.HTTPError as e:
         detail = str(e)
         if e.response is not None:

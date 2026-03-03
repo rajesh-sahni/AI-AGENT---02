@@ -79,6 +79,9 @@ Optional query params: `body`, `draft`, `head_repo_owner` (for forks).
 4. **With body**:
    ```bash
    curl -X POST "http://localhost:8000/github/repos/YOUR_OWNER/YOUR_REPO/pulls?head=feature-xyz&base=main&title=Test%20PR&body=Description%20of%20changes"
+
+   example: curl -X POST "http://localhost:8000/github/repos/rajesh-sahni/FAQ-AGENt/pulls?head=dev&base=main&title=Test%20PR&body=Description%20of%20changes"
+   
    ```
 
 5. **PowerShell alternative**:
