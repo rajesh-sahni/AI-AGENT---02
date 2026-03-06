@@ -18,7 +18,10 @@ class ChatRequest(BaseModel):
     """Request to send a chat message to the AI agent."""
 
     message: str = Field(..., description="User message to send")
-    model: str = Field(default="llama3.2", description="Ollama model name (e.g. llama3.2, llama2)")
+    model: str = Field(
+        default="deepseek-r1:1.5b",
+        description="Ollama model name (e.g. deepseek-r1:1.5b)",
+    )
     history: list[ChatMessage] = Field(default_factory=list, description="Previous chat history")
     stream: bool = Field(default=False, description="Whether to stream the response")
 

@@ -141,11 +141,6 @@ def _extract_repo_name(message: str) -> Optional[str]:
             if name and name.lower() not in {"repos", "repositories"}:
                 return name
 
-    # Fallback: if the whole message looks like a single repo name token
-    simple = text.replace(" ", "")
-    if simple and all(ch.isalnum() or ch in {"-", "_", "."} for ch in simple):
-        return simple
-
     return None
 
 
@@ -493,5 +488,9 @@ def chat_page():
     """Serve the ChatGPT-like chat UI (ChatGPT-like interface)."""
     html_path = STATIC_DIR / "chat.html"
     if html_path.exists():
-        return FileResponse(html_path, media_type="text/html")
+        return FileResponse(
+            html_path,
+            media_type="text/html",
+            headers={"Cache-Control": "no-store, max-age=0"},
+        )
     raise HTTPException(status_code=404, detail="Chat UI not found")

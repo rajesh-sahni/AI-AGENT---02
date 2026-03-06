@@ -8,6 +8,7 @@ from typing import Any, Optional
 import requests
 
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+OLLAMA_CHAT_TIMEOUT = int(os.getenv("OLLAMA_CHAT_TIMEOUT", "300"))  # seconds (DeepSeek-R1 can be slow)
 
 
 def _chat_url() -> str:
@@ -20,7 +21,7 @@ def _models_url() -> str:
 
 def chat(
     message: str,
-    model: str = "llama3.2",
+    model: str = "deepseek-r1:1.5b",
     history: Optional[list[dict[str, str]]] = None,
     stream: bool = False,
 ) -> dict[str, Any]:
@@ -46,7 +47,7 @@ def chat(
     resp = requests.post(
         _chat_url(),
         json=payload,
-        timeout=120,
+        timeout=OLLAMA_CHAT_TIMEOUT,
     )
     resp.raise_for_status()
     data = resp.json()
