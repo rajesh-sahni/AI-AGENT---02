@@ -269,10 +269,10 @@
         <div class="github-feature-wrapper">
           <button type="button" id="github-feature-btn">GitHub Feature</button>
           <div class="github-dropdown" id="github-dropdown">
-            <button type="button" class="github-dropdown-item">Show all github repository</button>
-            <button type="button" class="github-dropdown-item">show repo details</button>
-            <button type="button" class="github-dropdown-item">show branch details</button>
-            <button type="button" class="github-dropdown-item">Create Pull Request</button>
+            <button type="button" class="github-dropdown-item" data-action="show-all-repos">Show all github repository</button>
+            <button type="button" class="github-dropdown-item" data-action="show-repo-details">show repo details</button>
+            <button type="button" class="github-dropdown-item" data-action="show-branch-details">show branch details</button>
+            <button type="button" class="github-dropdown-item" data-action="create-pr">Create Pull Request</button>
           </div>
         </div>
         <textarea id="message-input" placeholder="Type your message..." rows="1"></textarea>
@@ -297,6 +297,16 @@
       if (!e.target.closest('.github-feature-wrapper')) {
         githubDropdown.classList.remove('open');
       }
+    });
+
+    githubDropdown.querySelectorAll('.github-dropdown-item').forEach(btn => {
+      btn.addEventListener('click', () => {
+        githubDropdown.classList.remove('open');
+        const action = btn.getAttribute('data-action');
+        if (action === 'show-all-repos') {
+          sendMessage('show me all my github repos');
+        }
+      });
     });
 
     let chatHistory = [];
