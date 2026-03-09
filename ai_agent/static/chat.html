@@ -127,15 +127,17 @@
     }
 
     #input-form {
-      max-width: 42rem;
+      max-width: 56rem;
       margin: 0 auto;
       display: flex;
       gap: 0.75rem;
       align-items: flex-end;
+      width: 100%;
     }
 
     #message-input {
       flex: 1;
+      min-width: 18rem;
       padding: 0.875rem 1rem;
       font-size: 1rem;
       font-family: inherit;
@@ -178,6 +180,72 @@
       cursor: not-allowed;
     }
 
+    .input-row {
+      display: flex;
+      gap: 0.75rem;
+      align-items: flex-end;
+      flex: 1;
+    }
+
+    .github-feature-wrapper {
+      position: relative;
+    }
+
+    #github-feature-btn {
+      padding: 0.875rem 1rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    #github-feature-btn:hover {
+      border-color: var(--accent);
+    }
+
+    .github-dropdown {
+      display: none;
+      position: absolute;
+      bottom: 100%;
+      left: 0;
+      margin-bottom: 0.5rem;
+      min-width: 220px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      z-index: 100;
+    }
+
+    .github-dropdown.open {
+      display: block;
+    }
+
+    .github-dropdown-item {
+      display: block;
+      width: 100%;
+      padding: 0.75rem 1rem;
+      font-size: 0.9rem;
+      color: var(--text-primary);
+      background: none;
+      border: none;
+      text-align: left;
+      cursor: pointer;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .github-dropdown-item:last-child {
+      border-bottom: none;
+    }
+
+    .github-dropdown-item:hover {
+      background: var(--bg-message-user);
+    }
+
     .error {
       background: #3d1f1f;
       border-color: #5c2d2d;
@@ -197,8 +265,19 @@
 
   <div id="input-area">
     <form id="input-form">
-      <textarea id="message-input" placeholder="Type your message..." rows="1"></textarea>
-      <button type="submit" id="send-btn">Send</button>
+      <div class="input-row">
+        <div class="github-feature-wrapper">
+          <button type="button" id="github-feature-btn">GitHub Feature</button>
+          <div class="github-dropdown" id="github-dropdown">
+            <button type="button" class="github-dropdown-item">Show all github repository</button>
+            <button type="button" class="github-dropdown-item">show repo details</button>
+            <button type="button" class="github-dropdown-item">show branch details</button>
+            <button type="button" class="github-dropdown-item">Create Pull Request</button>
+          </div>
+        </div>
+        <textarea id="message-input" placeholder="Type your message..." rows="1"></textarea>
+        <button type="submit" id="send-btn">Send</button>
+      </div>
     </form>
   </div>
 
@@ -207,6 +286,18 @@
     const inputForm = document.getElementById('input-form');
     const messageInput = document.getElementById('message-input');
     const sendBtn = document.getElementById('send-btn');
+    const githubFeatureBtn = document.getElementById('github-feature-btn');
+    const githubDropdown = document.getElementById('github-dropdown');
+
+    githubFeatureBtn.addEventListener('click', () => {
+      githubDropdown.classList.toggle('open');
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.github-feature-wrapper')) {
+        githubDropdown.classList.remove('open');
+      }
+    });
 
     let chatHistory = [];
 
