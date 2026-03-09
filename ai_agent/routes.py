@@ -481,16 +481,3 @@ def post_chat(request: ChatRequest):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/chat")
-def chat_page():
-    """Serve the ChatGPT-like chat UI (ChatGPT-like interface)."""
-    html_path = STATIC_DIR / "chat.html"
-    if html_path.exists():
-        return FileResponse(
-            html_path,
-            media_type="text/html",
-            headers={"Cache-Control": "no-store, max-age=0"},
-        )
-    raise HTTPException(status_code=404, detail="Chat UI not found")
