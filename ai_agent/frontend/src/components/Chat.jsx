@@ -238,28 +238,28 @@ export default function Chat() {
                     className="github-dropdown-item"
                     onClick={() => handleGithubAction('show-all-repos')}
                   >
-                    Show all github repository
+                    Show all github repos
                   </button>
                   <button
                     type="button"
                     className="github-dropdown-item"
                     onClick={() => handleGithubAction('show-repo-details')}
                   >
-                    show repo details
+                    Show repo details
                   </button>
                   <button
                     type="button"
                     className="github-dropdown-item"
                     onClick={() => handleGithubAction('show-branch-details')}
                   >
-                    show branch details
+                    Show branch details
                   </button>
                   <button
                     type="button"
                     className="github-dropdown-item"
                     onClick={() => handleGithubAction('create-pr')}
                   >
-                    Create Pull Request
+                    Edit Files
                   </button>
                 </div>
               )}
