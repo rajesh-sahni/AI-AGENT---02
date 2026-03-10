@@ -18,8 +18,14 @@ export default function Chat() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [githubMenuOpen, setGithubMenuOpen] = useState(false);
+  const [repoDetailsDialogOpen, setRepoDetailsDialogOpen] = useState(false);
+  const [reposList, setReposList] = useState([]);
+  const [selectedRepoForDetails, setSelectedRepoForDetails] = useState('');
+  const [loadingRepos, setLoadingRepos] = useState(false);
+  const [repoSelectOpen, setRepoSelectOpen] = useState(false);
   const containerRef = useRef(null);
   const githubWrapperRef = useRef(null);
+  const repoSelectRef = useRef(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -31,10 +37,13 @@ export default function Chat() {
       if (githubWrapperRef.current && !githubWrapperRef.current.contains(e.target)) {
         setGithubMenuOpen(false);
       }
+      if (repoSelectOpen && repoSelectRef.current && !repoSelectRef.current.contains(e.target)) {
+        setRepoSelectOpen(false);
+      }
     }
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
-  }, []);
+  }, [repoSelectOpen]);
 
   async function send(text) {
     const trimmed = text.trim();
@@ -83,12 +92,41 @@ export default function Chat() {
     send(input);
   }
 
+  async function openRepoDetailsDialog() {
+    setGithubMenuOpen(false);
+    setRepoDetailsDialogOpen(true);
+    setSelectedRepoForDetails('');
+    setRepoSelectOpen(false);
+    setLoadingRepos(true);
+    setReposList([]);
+    try {
+      const res = await fetch(`${API_BASE_URL}/github/repos?per_page=100`);
+      const data = await res.json();
+      if (res.ok && data.nodes && data.nodes.length) {
+        setReposList(data.nodes);
+        setSelectedRepoForDetails(data.nodes[0].name || '');
+      } else {
+        setReposList([]);
+      }
+    } catch (err) {
+      setReposList([]);
+    } finally {
+      setLoadingRepos(false);
+    }
+  }
+
+  function handleRepoDetailsOk() {
+    if (!selectedRepoForDetails.trim()) return;
+    send(`show details of repo ${selectedRepoForDetails}`);
+    setRepoDetailsDialogOpen(false);
+  }
+
   function handleGithubAction(action) {
     setGithubMenuOpen(false);
     if (action === 'show-all-repos') {
       send('show me all my github repos');
     } else if (action === 'show-repo-details') {
-      send('show repo details of FAQ-AGENt');
+      openRepoDetailsDialog();
     } else if (action === 'show-branch-details') {
       send('show the main branch of FAQ-AGENt repo');
     } else if (action === 'create-pr') {
@@ -170,6 +208,63 @@ export default function Chat() {
         </form>
         {error && <div className="error-banner">{error}</div>}
       </div>
+
+      {repoDetailsDialogOpen && (
+        <div className="dialog-backdrop" onClick={() => setRepoDetailsDialogOpen(false)}>
+          <div className="dialog-box" onClick={e => e.stopPropagation()}>
+            <h3 className="dialog-title">Show repository details</h3>
+            <p className="dialog-label">Select repository</p>
+            {loadingRepos ? (
+              <p className="dialog-loading">Loading repositories…</p>
+            ) : (
+              <div className="dialog-select-wrapper" ref={repoSelectRef}>
+                <button
+                  type="button"
+                  className="dialog-select-trigger"
+                  onClick={() => setRepoSelectOpen(o => !o)}
+                  aria-expanded={repoSelectOpen}
+                  aria-haspopup="listbox"
+                >
+                  {selectedRepoForDetails
+                    ? reposList.find(r => r.name === selectedRepoForDetails)?.full_name || selectedRepoForDetails
+                    : '-- Select repo --'}
+                </button>
+                {repoSelectOpen && (
+                  <ul className="dialog-select-list" role="listbox">
+                    {reposList.map(repo => (
+                      <li
+                        key={repo.id}
+                        role="option"
+                        aria-selected={selectedRepoForDetails === repo.name}
+                        className={`dialog-select-option ${selectedRepoForDetails === repo.name ? 'selected' : ''}`}
+                        onClick={() => {
+                          setSelectedRepoForDetails(repo.name);
+                          setRepoSelectOpen(false);
+                        }}
+                      >
+                        {repo.full_name || repo.name}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+            <div className="dialog-actions">
+              <button type="button" className="dialog-btn dialog-cancel" onClick={() => setRepoDetailsDialogOpen(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="dialog-btn dialog-ok"
+                onClick={handleRepoDetailsOk}
+                disabled={loadingRepos || !selectedRepoForDetails}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
