@@ -38,12 +38,20 @@ export default function Chat() {
   const [loadingEditRepos, setLoadingEditRepos] = useState(false);
   const [editRepoSelectOpen, setEditRepoSelectOpen] = useState(false);
   const [editMessage, setEditMessage] = useState('');
+  const [editBranchDialogOpen, setEditBranchDialogOpen] = useState(false);
+  const [editBranchMode, setEditBranchMode] = useState(null); // 'new' | 'existing' | null
+  const [editNewBranchName, setEditNewBranchName] = useState('');
+  const [editBranchesList, setEditBranchesList] = useState([]);
+  const [loadingEditBranches, setLoadingEditBranches] = useState(false);
+  const [editBranchSelectOpen, setEditBranchSelectOpen] = useState(false);
+  const [selectedEditExistingBranch, setSelectedEditExistingBranch] = useState('');
   const containerRef = useRef(null);
   const githubWrapperRef = useRef(null);
   const repoSelectRef = useRef(null);
   const branchRepoSelectRef = useRef(null);
   const branchNameSelectRef = useRef(null);
   const editRepoSelectRef = useRef(null);
+  const editBranchSelectRef = useRef(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -67,10 +75,13 @@ export default function Chat() {
       if (editRepoSelectOpen && editRepoSelectRef.current && !editRepoSelectRef.current.contains(e.target)) {
         setEditRepoSelectOpen(false);
       }
+      if (editBranchSelectOpen && editBranchSelectRef.current && !editBranchSelectRef.current.contains(e.target)) {
+        setEditBranchSelectOpen(false);
+      }
     }
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
-  }, [repoSelectOpen, branchRepoSelectOpen, branchNameSelectOpen, editRepoSelectOpen]);
+  }, [repoSelectOpen, branchRepoSelectOpen, branchNameSelectOpen, editRepoSelectOpen, editBranchSelectOpen]);
 
   async function send(text) {
     const trimmed = text.trim();
@@ -232,6 +243,55 @@ export default function Chat() {
     }
   }
 
+  function openEditBranchDialog() {
+    // Keep selected repo and message; just move to the branch-choice step.
+    setEditFilesDialogOpen(false);
+    setEditBranchDialogOpen(true);
+    setEditBranchMode(null);
+    setEditNewBranchName('');
+    setEditBranchesList([]);
+    setSelectedEditExistingBranch('');
+    setEditBranchSelectOpen(false);
+    setLoadingEditBranches(false);
+  }
+
+  async function loadEditBranches() {
+    if (!selectedEditRepo) {
+      setEditBranchesList([]);
+      setSelectedEditExistingBranch('');
+      return;
+    }
+    const repo = editReposList.find(r => r.name === selectedEditRepo);
+    if (!repo) {
+      setEditBranchesList([]);
+      setSelectedEditExistingBranch('');
+      return;
+    }
+    const owner = (repo.owner && repo.owner.login) || (repo.full_name && repo.full_name.split('/')[0]) || '';
+    if (!owner) {
+      setEditBranchesList([]);
+      setSelectedEditExistingBranch('');
+      return;
+    }
+    setLoadingEditBranches(true);
+    setSelectedEditExistingBranch('');
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo.name)}/branches`,
+      );
+      const data = await res.json();
+      const branches = (data && data.branches) || [];
+      setEditBranchesList(branches);
+      if (branches.length) {
+        setSelectedEditExistingBranch(branches[0].name || '');
+      }
+    } catch (err) {
+      setEditBranchesList([]);
+    } finally {
+      setLoadingEditBranches(false);
+    }
+  }
+
   function handleGithubAction(action) {
     setGithubMenuOpen(false);
     if (action === 'show-all-repos') {
@@ -375,8 +435,111 @@ export default function Chat() {
               >
                 Cancel
               </button>
-              <button type="button" className="dialog-btn dialog-ok">
+              <button
+                type="button"
+                className="dialog-btn dialog-ok"
+                onClick={openEditBranchDialog}
+              >
                 Commit changes and create PR
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editBranchDialogOpen && (
+        <div className="dialog-backdrop" onClick={() => setEditBranchDialogOpen(false)}>
+          <div className="dialog-box" onClick={e => e.stopPropagation()}>
+            <h3 className="dialog-title">Create PR - choose branch</h3>
+            <p className="dialog-label">Do you want to create new branch?</p>
+            <div className="dialog-actions" style={{ justifyContent: 'flex-start', marginBottom: '1rem' }}>
+              <button
+                type="button"
+                className="dialog-btn dialog-ok"
+                onClick={() => {
+                  setEditBranchMode('new');
+                }}
+              >
+                Yes
+              </button>
+              <button
+                type="button"
+                className="dialog-btn dialog-ok"
+                onClick={async () => {
+                  setEditBranchMode('existing');
+                  if (!editBranchesList.length) {
+                    await loadEditBranches();
+                  }
+                }}
+              >
+                No
+              </button>
+            </div>
+
+            {editBranchMode === 'new' && (
+              <>
+                <p className="dialog-label">Enter branch name</p>
+                <input
+                  type="text"
+                  className="dialog-textarea"
+                  style={{ resize: 'none', minHeight: 'auto' }}
+                  value={editNewBranchName}
+                  onChange={e => setEditNewBranchName(e.target.value)}
+                  placeholder="e.g. dev"
+                />
+              </>
+            )}
+
+            {editBranchMode === 'existing' && (
+              <>
+                <p className="dialog-label">Select branch</p>
+                {loadingEditBranches ? (
+                  <p className="dialog-loading">Loading branches…</p>
+                ) : (
+                  <div className="dialog-select-wrapper" ref={editBranchSelectRef}>
+                    <button
+                      type="button"
+                      className="dialog-select-trigger"
+                      onClick={() => setEditBranchSelectOpen(o => !o)}
+                      aria-expanded={editBranchSelectOpen}
+                    >
+                      {selectedEditExistingBranch || '-- Select branch --'}
+                    </button>
+                    {editBranchSelectOpen && (
+                      <ul className="dialog-select-list" role="listbox">
+                        {editBranchesList.map(b => (
+                          <li
+                            key={b.name}
+                            role="option"
+                            aria-selected={selectedEditExistingBranch === b.name}
+                            className={`dialog-select-option ${
+                              selectedEditExistingBranch === b.name ? 'selected' : ''
+                            }`}
+                            onClick={() => {
+                              setSelectedEditExistingBranch(b.name);
+                              setEditBranchSelectOpen(false);
+                            }}
+                          >
+                            {b.name}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+
+            <div className="dialog-actions">
+              <button
+                type="button"
+                className="dialog-btn dialog-cancel"
+                onClick={() => setEditBranchDialogOpen(false)}
+              >
+                Cancel
+              </button>
+              <button type="button" className="dialog-btn dialog-ok">
+                OK
               </button>
             </div>
           </div>
