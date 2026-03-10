@@ -5,7 +5,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from ai_agent.routes import router as ai_router
-from github_client import create_pull_request, get_branch, get_repo, list_repos
+from github_client import create_pull_request, get_branch, get_repo, list_branches, list_repos
 from linear_client import get_issue, list_issues
 
 app = FastAPI()
@@ -146,6 +146,20 @@ def read_github_repo_branch(
         if branch_data is None:
             raise HTTPException(status_code=404, detail="Repo or branch not found")
         return branch_data
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/github/repos/{owner}/{repo}/branches")
+def read_github_repo_branches(owner: str, repo: str):
+    """
+    List branches of a repository.
+    """
+    try:
+        branches = list_branches(owner=owner, repo=repo)
+        return {"branches": branches}
     except ValueError as e:
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:

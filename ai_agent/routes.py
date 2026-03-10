@@ -37,12 +37,13 @@ GITHUB_REPOS_INTENT_PATTERNS = [
     r"get\s+(?:me\s+)?(?:my\s+)?repos(?:itories)?",
 ]
 
-# Intent patterns for "show (main/dev) branch of repo X"
+# Intent patterns for "show (main/dev/any) branch of repo X"
 GITHUB_BRANCH_INTENT_PATTERNS = [
     r"show\s+(?:the\s+)?(?P<branch>main|dev|master|develop)\s+branch\s+(?:of\s+)?(?P<repo>[\w\-\.]+)\s*(?:repo(?:sitory)?)?",
     r"(?P<branch>main|dev|master|develop)\s+branch\s+(?:of\s+)?(?P<repo>[\w\-\.]+)",
     r"show\s+branch\s+(?:of\s+)?(?P<repo>[\w\-\.]+)\s*(?:repo(?:sitory)?)?",
     r"branch\s+(?:details?\s+)?(?:of\s+)?(?P<repo>[\w\-\.]+)\s*(?:repo(?:sitory)?)?",
+    r"show\s+(?:the\s+)(?P<branch>[\w\-./]+)\s+branch\s+(?:of\s+)?(?P<repo>[\w\-\.]+)\s*(?:repo(?:sitory)?)?",
 ]
 
 # Intent patterns for "show details of repo X"

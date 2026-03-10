@@ -23,9 +23,20 @@ export default function Chat() {
   const [selectedRepoForDetails, setSelectedRepoForDetails] = useState('');
   const [loadingRepos, setLoadingRepos] = useState(false);
   const [repoSelectOpen, setRepoSelectOpen] = useState(false);
+  const [branchDetailsDialogOpen, setBranchDetailsDialogOpen] = useState(false);
+  const [branchReposList, setBranchReposList] = useState([]);
+  const [selectedBranchRepo, setSelectedBranchRepo] = useState('');
+  const [selectedBranch, setSelectedBranch] = useState('');
+  const [branchesList, setBranchesList] = useState([]);
+  const [loadingBranchRepos, setLoadingBranchRepos] = useState(false);
+  const [loadingBranches, setLoadingBranches] = useState(false);
+  const [branchRepoSelectOpen, setBranchRepoSelectOpen] = useState(false);
+  const [branchNameSelectOpen, setBranchNameSelectOpen] = useState(false);
   const containerRef = useRef(null);
   const githubWrapperRef = useRef(null);
   const repoSelectRef = useRef(null);
+  const branchRepoSelectRef = useRef(null);
+  const branchNameSelectRef = useRef(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -40,10 +51,16 @@ export default function Chat() {
       if (repoSelectOpen && repoSelectRef.current && !repoSelectRef.current.contains(e.target)) {
         setRepoSelectOpen(false);
       }
+      if (branchRepoSelectOpen && branchRepoSelectRef.current && !branchRepoSelectRef.current.contains(e.target)) {
+        setBranchRepoSelectOpen(false);
+      }
+      if (branchNameSelectOpen && branchNameSelectRef.current && !branchNameSelectRef.current.contains(e.target)) {
+        setBranchNameSelectOpen(false);
+      }
     }
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
-  }, [repoSelectOpen]);
+  }, [repoSelectOpen, branchRepoSelectOpen, branchNameSelectOpen]);
 
   async function send(text) {
     const trimmed = text.trim();
@@ -121,6 +138,66 @@ export default function Chat() {
     setRepoDetailsDialogOpen(false);
   }
 
+  async function openBranchDetailsDialog() {
+    setGithubMenuOpen(false);
+    setBranchDetailsDialogOpen(true);
+    setSelectedBranchRepo('');
+    setSelectedBranch('');
+    setBranchReposList([]);
+    setBranchesList([]);
+    setBranchRepoSelectOpen(false);
+    setBranchNameSelectOpen(false);
+    setLoadingBranchRepos(true);
+    setLoadingBranches(false);
+    try {
+      const res = await fetch(`${API_BASE_URL}/github/repos?per_page=100`);
+      const data = await res.json();
+      if (res.ok && data.nodes && data.nodes.length) {
+        setBranchReposList(data.nodes);
+        setSelectedBranchRepo(data.nodes[0].name || '');
+      } else {
+        setBranchReposList([]);
+      }
+    } catch (err) {
+      setBranchReposList([]);
+    } finally {
+      setLoadingBranchRepos(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!branchDetailsDialogOpen || !selectedBranchRepo) return;
+    const repo = branchReposList.find(r => r.name === selectedBranchRepo);
+    if (!repo) {
+      setBranchesList([]);
+      setSelectedBranch('');
+      return;
+    }
+    const owner = (repo.owner && repo.owner.login) || (repo.full_name && repo.full_name.split('/')[0]) || '';
+    if (!owner) {
+      setBranchesList([]);
+      setSelectedBranch('');
+      return;
+    }
+    setLoadingBranches(true);
+    setSelectedBranch('');
+    fetch(`${API_BASE_URL}/github/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo.name)}/branches`)
+      .then(r => r.json())
+      .then(data => {
+        const branches = (data && data.branches) || [];
+        setBranchesList(branches);
+        if (branches.length) setSelectedBranch(branches[0].name || '');
+      })
+      .catch(() => setBranchesList([]))
+      .finally(() => setLoadingBranches(false));
+  }, [branchDetailsDialogOpen, selectedBranchRepo, branchReposList]);
+
+  function handleBranchDetailsOk() {
+    if (!selectedBranchRepo.trim() || !selectedBranch.trim()) return;
+    send(`show the ${selectedBranch} branch of ${selectedBranchRepo} repo`);
+    setBranchDetailsDialogOpen(false);
+  }
+
   function handleGithubAction(action) {
     setGithubMenuOpen(false);
     if (action === 'show-all-repos') {
@@ -128,7 +205,7 @@ export default function Chat() {
     } else if (action === 'show-repo-details') {
       openRepoDetailsDialog();
     } else if (action === 'show-branch-details') {
-      send('show the main branch of FAQ-AGENt repo');
+      openBranchDetailsDialog();
     } else if (action === 'create-pr') {
       send('create pull request from dev to main of repo FAQ-AGENt');
     }
@@ -208,6 +285,95 @@ export default function Chat() {
         </form>
         {error && <div className="error-banner">{error}</div>}
       </div>
+
+      {branchDetailsDialogOpen && (
+        <div className="dialog-backdrop" onClick={() => setBranchDetailsDialogOpen(false)}>
+          <div className="dialog-box" onClick={e => e.stopPropagation()}>
+            <h3 className="dialog-title">Show branch details</h3>
+            <p className="dialog-label">Select repository</p>
+            {loadingBranchRepos ? (
+              <p className="dialog-loading">Loading repositories…</p>
+            ) : (
+              <div className="dialog-select-wrapper" ref={branchRepoSelectRef}>
+                <button
+                  type="button"
+                  className="dialog-select-trigger"
+                  onClick={() => setBranchRepoSelectOpen(o => !o)}
+                  aria-expanded={branchRepoSelectOpen}
+                >
+                  {selectedBranchRepo
+                    ? branchReposList.find(r => r.name === selectedBranchRepo)?.full_name || selectedBranchRepo
+                    : '-- Select repo --'}
+                </button>
+                {branchRepoSelectOpen && (
+                  <ul className="dialog-select-list" role="listbox">
+                    {branchReposList.map(repo => (
+                      <li
+                        key={repo.id}
+                        role="option"
+                        aria-selected={selectedBranchRepo === repo.name}
+                        className={`dialog-select-option ${selectedBranchRepo === repo.name ? 'selected' : ''}`}
+                        onClick={() => {
+                          setSelectedBranchRepo(repo.name);
+                          setBranchRepoSelectOpen(false);
+                        }}
+                      >
+                        {repo.full_name || repo.name}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+            <p className="dialog-label">Select branch</p>
+            {loadingBranches ? (
+              <p className="dialog-loading">Loading branches…</p>
+            ) : (
+              <div className="dialog-select-wrapper" ref={branchNameSelectRef}>
+                <button
+                  type="button"
+                  className="dialog-select-trigger"
+                  onClick={() => setBranchNameSelectOpen(o => !o)}
+                  aria-expanded={branchNameSelectOpen}
+                >
+                  {selectedBranch || '-- Select branch --'}
+                </button>
+                {branchNameSelectOpen && (
+                  <ul className="dialog-select-list" role="listbox">
+                    {branchesList.map(b => (
+                      <li
+                        key={b.name}
+                        role="option"
+                        aria-selected={selectedBranch === b.name}
+                        className={`dialog-select-option ${selectedBranch === b.name ? 'selected' : ''}`}
+                        onClick={() => {
+                          setSelectedBranch(b.name);
+                          setBranchNameSelectOpen(false);
+                        }}
+                      >
+                        {b.name}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+            <div className="dialog-actions">
+              <button type="button" className="dialog-btn dialog-cancel" onClick={() => setBranchDetailsDialogOpen(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="dialog-btn dialog-ok"
+                onClick={handleBranchDetailsOk}
+                disabled={loadingBranchRepos || loadingBranches || !selectedBranchRepo || !selectedBranch}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {repoDetailsDialogOpen && (
         <div className="dialog-backdrop" onClick={() => setRepoDetailsDialogOpen(false)}>

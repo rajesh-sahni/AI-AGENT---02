@@ -110,6 +110,22 @@ def get_repo(owner: str, repo: str) -> Optional[dict[str, Any]]:
         raise
 
 
+def list_branches(owner: str, repo: str, per_page: int = 100) -> list[dict[str, Any]]:
+    """
+    List branches of a repository.
+
+    :param owner: GitHub username or org name.
+    :param repo: Repository name.
+    :param per_page: Max branches to return (default 100).
+    :return: List of branch dicts (name, commit, protected, etc.).
+    """
+    try:
+        data = _get(f"repos/{owner}/{repo}/branches", params={"per_page": per_page})
+        return data if isinstance(data, list) else []
+    except requests.HTTPError:
+        return []
+
+
 def get_branch(
     owner: str,
     repo: str,
