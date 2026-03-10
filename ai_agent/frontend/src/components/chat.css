@@ -320,3 +320,28 @@
   cursor: not-allowed;
 }
 
+.dialog-textarea {
+  width: 100%;
+  margin-top: 0.25rem;
+  margin-bottom: 1rem;
+  padding: 0.75rem 0.85rem;
+  font-size: 0.95rem;
+  font-family: inherit;
+  color: #e4e4e4;
+  background: #2d2d2d;
+  border: 1px solid #333;
+  border-radius: 0.5rem;
+  resize: vertical;
+  min-height: 96px;
+  max-height: 260px;
+}
+
+.dialog-textarea::placeholder {
+  color: #a0a0a0;
+}
+
+.dialog-textarea:focus {
+  outline: none;
+  border-color: #10a37f;
+}
+

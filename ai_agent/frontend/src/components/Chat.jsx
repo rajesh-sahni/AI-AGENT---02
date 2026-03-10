@@ -32,11 +32,18 @@ export default function Chat() {
   const [loadingBranches, setLoadingBranches] = useState(false);
   const [branchRepoSelectOpen, setBranchRepoSelectOpen] = useState(false);
   const [branchNameSelectOpen, setBranchNameSelectOpen] = useState(false);
+  const [editFilesDialogOpen, setEditFilesDialogOpen] = useState(false);
+  const [editReposList, setEditReposList] = useState([]);
+  const [selectedEditRepo, setSelectedEditRepo] = useState('');
+  const [loadingEditRepos, setLoadingEditRepos] = useState(false);
+  const [editRepoSelectOpen, setEditRepoSelectOpen] = useState(false);
+  const [editMessage, setEditMessage] = useState('');
   const containerRef = useRef(null);
   const githubWrapperRef = useRef(null);
   const repoSelectRef = useRef(null);
   const branchRepoSelectRef = useRef(null);
   const branchNameSelectRef = useRef(null);
+  const editRepoSelectRef = useRef(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -57,10 +64,13 @@ export default function Chat() {
       if (branchNameSelectOpen && branchNameSelectRef.current && !branchNameSelectRef.current.contains(e.target)) {
         setBranchNameSelectOpen(false);
       }
+      if (editRepoSelectOpen && editRepoSelectRef.current && !editRepoSelectRef.current.contains(e.target)) {
+        setEditRepoSelectOpen(false);
+      }
     }
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
-  }, [repoSelectOpen, branchRepoSelectOpen, branchNameSelectOpen]);
+  }, [repoSelectOpen, branchRepoSelectOpen, branchNameSelectOpen, editRepoSelectOpen]);
 
   async function send(text) {
     const trimmed = text.trim();
@@ -198,6 +208,30 @@ export default function Chat() {
     setBranchDetailsDialogOpen(false);
   }
 
+  async function openEditFilesDialog() {
+    setGithubMenuOpen(false);
+    setEditFilesDialogOpen(true);
+    setSelectedEditRepo('');
+    setEditMessage('');
+    setEditReposList([]);
+    setEditRepoSelectOpen(false);
+    setLoadingEditRepos(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/github/repos?per_page=100`);
+      const data = await res.json();
+      if (res.ok && data.nodes && data.nodes.length) {
+        setEditReposList(data.nodes);
+        setSelectedEditRepo(data.nodes[0].name || '');
+      } else {
+        setEditReposList([]);
+      }
+    } catch (err) {
+      setEditReposList([]);
+    } finally {
+      setLoadingEditRepos(false);
+    }
+  }
+
   function handleGithubAction(action) {
     setGithubMenuOpen(false);
     if (action === 'show-all-repos') {
@@ -207,7 +241,7 @@ export default function Chat() {
     } else if (action === 'show-branch-details') {
       openBranchDetailsDialog();
     } else if (action === 'create-pr') {
-      send('create pull request from dev to main of repo FAQ-AGENt');
+      openEditFilesDialog();
     }
   }
 
@@ -285,6 +319,69 @@ export default function Chat() {
         </form>
         {error && <div className="error-banner">{error}</div>}
       </div>
+
+      {editFilesDialogOpen && (
+        <div className="dialog-backdrop" onClick={() => setEditFilesDialogOpen(false)}>
+          <div className="dialog-box" onClick={e => e.stopPropagation()}>
+            <h3 className="dialog-title">Edit files</h3>
+            <p className="dialog-label">Select repository</p>
+            {loadingEditRepos ? (
+              <p className="dialog-loading">Loading repositories…</p>
+            ) : (
+              <div className="dialog-select-wrapper" ref={editRepoSelectRef}>
+                <button
+                  type="button"
+                  className="dialog-select-trigger"
+                  onClick={() => setEditRepoSelectOpen(o => !o)}
+                  aria-expanded={editRepoSelectOpen}
+                >
+                  {selectedEditRepo
+                    ? editReposList.find(r => r.name === selectedEditRepo)?.full_name || selectedEditRepo
+                    : '-- Select repo --'}
+                </button>
+                {editRepoSelectOpen && (
+                  <ul className="dialog-select-list" role="listbox">
+                    {editReposList.map(repo => (
+                      <li
+                        key={repo.id}
+                        role="option"
+                        aria-selected={selectedEditRepo === repo.name}
+                        className={`dialog-select-option ${selectedEditRepo === repo.name ? 'selected' : ''}`}
+                        onClick={() => {
+                          setSelectedEditRepo(repo.name);
+                          setEditRepoSelectOpen(false);
+                        }}
+                      >
+                        {repo.full_name || repo.name}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+            <p className="dialog-label">Describe the changes you want</p>
+            <textarea
+              className="dialog-textarea"
+              rows={5}
+              value={editMessage}
+              onChange={e => setEditMessage(e.target.value)}
+              placeholder="Describe what changes you want in this repository..."
+            />
+            <div className="dialog-actions">
+              <button
+                type="button"
+                className="dialog-btn dialog-cancel"
+                onClick={() => setEditFilesDialogOpen(false)}
+              >
+                Cancel
+              </button>
+              <button type="button" className="dialog-btn dialog-ok">
+                Commit changes and create PR
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {branchDetailsDialogOpen && (
         <div className="dialog-backdrop" onClick={() => setBranchDetailsDialogOpen(false)}>
