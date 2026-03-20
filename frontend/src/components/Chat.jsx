@@ -296,6 +296,8 @@ export default function Chat() {
     setGithubMenuOpen(false);
     if (action === 'show-all-repos') {
       send('show me all my github repos');
+    } else if (action === 'show-all-linear-issues') {
+      send('show all linear issues');
     } else if (action === 'show-repo-details') {
       openRepoDetailsDialog();
     } else if (action === 'show-branch-details') {
@@ -333,6 +335,13 @@ export default function Chat() {
                     onClick={() => handleGithubAction('show-all-repos')}
                   >
                     Show all github repos
+                  </button>
+                  <button
+                    type="button"
+                    className="github-dropdown-item"
+                    onClick={() => handleGithubAction('show-all-linear-issues')}
+                  >
+                    Show all Linear Issues
                   </button>
                   <button
                     type="button"

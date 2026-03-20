@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse
 from ai_agent.ollama_client import chat, list_models
 from ai_agent.schemas import ChatRequest, ChatResponse
 from github_client import create_pull_request, get_branch, list_repos
+from linear_client import list_issues
 
 router = APIRouter(prefix="/ai", tags=["AI Agent"])
 
@@ -35,6 +36,15 @@ GITHUB_REPOS_INTENT_PATTERNS = [
     r"repos(?:itories)?\s+(?:of\s+)?(?:my\s+)?(?:github|account)",
     r"(?:my\s+)?github\s+repos(?:itories)?",
     r"get\s+(?:me\s+)?(?:my\s+)?repos(?:itories)?",
+]
+
+# Intent patterns for "show/list all Linear issues"
+LINEAR_ISSUES_INTENT_PATTERNS = [
+    r"show\s+(?:me\s+)?(?:all\s+)?linear\s+issues",
+    r"list\s+(?:all\s+)?linear\s+issues",
+    r"(?:all\s+)?linear\s+issues",
+    r"show\s+(?:me\s+)?issues\s+from\s+linear",
+    r"list\s+issues\s+from\s+linear",
 ]
 
 # Intent patterns for "show (main/dev/any) branch of repo X"
@@ -110,6 +120,15 @@ def _is_github_repos_intent(message: str) -> bool:
     """Check if the user is asking to list their GitHub repositories."""
     text = message.strip().lower()
     for pattern in GITHUB_REPOS_INTENT_PATTERNS:
+        if re.search(pattern, text):
+            return True
+    return False
+
+
+def _is_linear_issues_intent(message: str) -> bool:
+    """Check if the user is asking to list Linear issues."""
+    text = message.strip().lower()
+    for pattern in LINEAR_ISSUES_INTENT_PATTERNS:
         if re.search(pattern, text):
             return True
     return False
@@ -253,6 +272,34 @@ def _format_branch_details(branch_data: dict[str, Any], repo_full_name: str) -> 
     return "\n".join(lines)
 
 
+def _format_linear_issues_response(issues_data: dict[str, Any]) -> str:
+    """Format Linear issues list into a readable chat message."""
+    nodes = issues_data.get("nodes", []) or []
+    page_info = issues_data.get("pageInfo", {}) or {}
+    has_next = page_info.get("hasNextPage", False)
+
+    if not nodes:
+        return "You don't have any Linear issues yet."
+
+    lines = ["Here are your Linear issues:\n"]
+    for i, issue in enumerate(nodes, 1):
+        identifier = issue.get("identifier", "UNKNOWN")
+        title = issue.get("title", "Untitled")
+        state_name = ((issue.get("state") or {}).get("name")) or "Unknown"
+        priority = issue.get("priorityLabel") or "No priority"
+        assignee_name = ((issue.get("assignee") or {}).get("name")) or "Unassigned"
+        url = issue.get("url", "")
+        lines.append(
+            f"{i}. {identifier}: {title}\n"
+            f"   State: {state_name} | Priority: {priority} | Assignee: {assignee_name}\n"
+            f"   {url}"
+        )
+
+    if has_next:
+        lines.append("\n(More Linear issues available.)")
+    return "\n".join(lines)
+
+
 @router.get("/models", response_model=dict[str, Any])
 def get_models():
     """
@@ -285,6 +332,7 @@ def post_chat(request: ChatRequest):
     Supports special intents:
     - "show me all repos of my github" -> lists all repos
     - "show details of repo XYZ" / "repo XYZ details" -> single repo details
+    - "show all linear issues" -> lists all issues from Linear
     """
     message = request.message.strip()
 
@@ -447,6 +495,30 @@ def post_chat(request: ChatRequest):
                 status_code=e.response.status_code if e.response else 500,
                 detail=detail,
             )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    # Intent: list Linear issues
+    if _is_linear_issues_intent(message):
+        try:
+            issues_data = list_issues(first=50)
+            formatted = _format_linear_issues_response(issues_data)
+            return ChatResponse(message=formatted, model="linear-api", done=True)
+        except ValueError as e:
+            raise HTTPException(status_code=500, detail=str(e))
+        except requests.HTTPError as e:
+            detail = str(e)
+            if e.response is not None:
+                try:
+                    detail = e.response.json().get("message", str(e))
+                except Exception:
+                    pass
+            raise HTTPException(
+                status_code=e.response.status_code if e.response else 500,
+                detail=detail,
+            )
+        except RuntimeError as e:
+            raise HTTPException(status_code=502, detail=str(e))
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
