@@ -9,16 +9,42 @@ venv\Scripts\activate   # Windows: It is used for command prompt to activate env
 
 source venv/Scripts/activate #Windows: It is user for git bash to activate envoirnment
 
-pip install -r requirements.txt
+pip install -r backend/requirements.txt
 ```
 
-## Run
+## Folder Structure
+
+```text
+AI AGENT - 02/
+├── backend/
+│   ├── app.py
+│   ├── config.py
+│   ├── github_client.py
+│   ├── linear_client.py
+│   ├── requirements.txt
+│   ├── .env
+│   └── ai_agent/
+└── frontend/
+    ├── package.json
+    └── src/
+```
+
+## Run Backend
 
 ```bash
+cd backend
 uvicorn app:app --reload
 ```
 
-Create a `.env` in the project root:
+## Run Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Create a `.env` in `backend/`:
 
 ```
 LINEAR_API_KEY=your_linear_api_key
